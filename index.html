@@ -1,0 +1,2101 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GitNotebook & Voice Vault | GitHub-Backed Notes & Audio</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#f0fdf4',
+              100: '#dcfce7',
+              500: '#22c55e',
+              600: '#16a34a',
+              700: '#15803d',
+              800: '#166534',
+              900: '#14532d',
+            },
+            github: {
+              dark: '#0d1117',
+              darker: '#010409',
+              border: '#30363d',
+              card: '#161b22',
+              btn: '#21262d'
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- Marked.js for Markdown -->
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <!-- DOMPurify for XSS safety -->
+  <script src="https://cdn.jsdelivr.net/npm/dompurify@3.0.6/dist/purify.min.js"></script>
+  <style>
+    /* Custom scrollbars */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(156, 163, 175, 0.4);
+      border-radius: 3px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: rgba(156, 163, 175, 0.7);
+    }
+    /* Markdown Preview Styling */
+    .markdown-body h1 { font-size: 1.875rem; font-weight: 700; margin-top: 1.25rem; margin-bottom: 0.75rem; border-bottom: 1px solid rgba(156, 163, 175, 0.3); padding-bottom: 0.3rem; }
+    .markdown-body h2 { font-size: 1.5rem; font-weight: 600; margin-top: 1rem; margin-bottom: 0.5rem; border-bottom: 1px solid rgba(156, 163, 175, 0.2); padding-bottom: 0.2rem; }
+    .markdown-body h3 { font-size: 1.25rem; font-weight: 600; margin-top: 0.75rem; margin-bottom: 0.5rem; }
+    .markdown-body p { margin-bottom: 0.75rem; line-height: 1.625; }
+    .markdown-body ul { list-style-type: disc; margin-left: 1.5rem; margin-bottom: 0.75rem; }
+    .markdown-body ol { list-style-type: decimal; margin-left: 1.5rem; margin-bottom: 0.75rem; }
+    .markdown-body li { margin-bottom: 0.25rem; }
+    .markdown-body blockquote { border-left: 4px solid #3b82f6; padding-left: 1rem; font-style: italic; margin: 0.75rem 0; opacity: 0.9; }
+    .markdown-body pre { background: rgba(0, 0, 0, 0.2); padding: 1rem; border-radius: 0.5rem; overflow-x: auto; margin-bottom: 0.75rem; font-family: monospace; }
+    .markdown-body code { background: rgba(150, 150, 150, 0.2); padding: 0.15rem 0.35rem; border-radius: 0.25rem; font-family: monospace; font-size: 0.875em; }
+    .markdown-body pre code { background: transparent; padding: 0; }
+    .markdown-body table { width: 100%; border-collapse: collapse; margin-bottom: 1rem; }
+    .markdown-body th, .markdown-body td { border: 1px solid rgba(156, 163, 175, 0.3); padding: 0.5rem 0.75rem; text-align: left; }
+    .markdown-body hr { margin: 1.5rem 0; border: 0; border-top: 1px solid rgba(156, 163, 175, 0.3); }
+    .markdown-body input[type="checkbox"] { margin-right: 0.5rem; }
+  </style>
+</head>
+<body class="h-full bg-slate-50 text-slate-900 dark:bg-github-dark dark:text-slate-100 flex flex-col font-sans transition-colors duration-200">
+
+  <!-- TOP NAVBAR -->
+  <header class="border-b border-slate-200 dark:border-github-border bg-white dark:bg-github-card px-4 py-2.5 flex items-center justify-between shadow-sm flex-shrink-0 z-20">
+    <div class="flex items-center gap-3">
+      <!-- Mobile Sidebar Toggle -->
+      <button id="btn-toggle-sidebar" class="lg:hidden p-1.5 rounded-lg text-slate-500 hover:bg-slate-100 dark:hover:bg-github-btn">
+        <i data-lucide="menu" class="w-5 h-5"></i>
+      </button>
+
+      <!-- App Logo & Title -->
+      <div class="flex items-center gap-2.5">
+        <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-brand-600 to-emerald-400 flex items-center justify-center text-white shadow-md shadow-brand-500/20">
+          <i data-lucide="book-marked" class="w-5 h-5"></i>
+        </div>
+        <div>
+          <h1 class="text-base font-bold tracking-tight flex items-center gap-1.5 leading-none">
+            GitNotebook <span class="text-xs font-semibold px-1.5 py-0.5 rounded bg-brand-100 text-brand-800 dark:bg-brand-900/60 dark:text-brand-300">Vault</span>
+          </h1>
+          <p class="text-[11px] text-slate-500 dark:text-slate-400 leading-none mt-0.5">Notes, Audio & Notebooks saved to GitHub</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Active Notebook / Mode Switcher -->
+    <div class="flex items-center gap-2">
+      <!-- Connection Status Badge / Button -->
+      <button id="btn-open-settings" class="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-github-border text-xs font-medium hover:bg-slate-100 dark:hover:bg-github-btn transition-colors">
+        <span id="conn-indicator" class="w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse"></span>
+        <span id="conn-text" class="hidden sm:inline">GitHub: Not Connected</span>
+        <i data-lucide="settings" class="w-3.5 h-3.5 text-slate-400"></i>
+      </button>
+
+      <!-- Dark / Light Theme Toggle -->
+      <button id="btn-theme-toggle" class="p-2 rounded-lg text-slate-500 hover:bg-slate-100 dark:hover:bg-github-btn transition-colors" title="Toggle Theme">
+        <i data-lucide="moon" class="w-4 h-4 dark:hidden"></i>
+        <i data-lucide="sun" class="w-4 h-4 hidden dark:inline text-amber-400"></i>
+      </button>
+    </div>
+  </header>
+
+  <!-- MAIN APP CONTAINER -->
+  <div class="flex-1 flex overflow-hidden relative">
+
+    <!-- SIDEBAR: Notebook & Repository Explorer -->
+    <aside id="sidebar" class="w-72 lg:w-80 border-r border-slate-200 dark:border-github-border bg-white dark:bg-github-card flex flex-col flex-shrink-0 absolute lg:relative inset-y-0 left-0 z-30 transform -translate-x-full lg:translate-x-0 transition-transform duration-200 shadow-xl lg:shadow-none">
+      
+      <!-- Sidebar Header -->
+      <div class="p-3 border-b border-slate-200 dark:border-github-border flex items-center justify-between">
+        <div class="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+          <i data-lucide="folder-git-2" class="w-4 h-4 text-brand-600 dark:text-brand-400"></i>
+          <span>Notebook Repository</span>
+        </div>
+        <div class="flex items-center gap-1">
+          <button id="btn-refresh-repo" class="p-1 rounded text-slate-500 hover:text-brand-600 hover:bg-slate-100 dark:hover:bg-github-btn transition-colors" title="Refresh from GitHub">
+            <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+          </button>
+          <button id="btn-close-sidebar" class="lg:hidden p-1 rounded text-slate-500 hover:bg-slate-100 dark:hover:bg-github-btn">
+            <i data-lucide="x" class="w-4 h-4"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- Quick Action Buttons -->
+      <div class="p-3 border-b border-slate-200 dark:border-github-border grid grid-cols-2 gap-2">
+        <button id="btn-new-note" class="flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-brand-600 hover:bg-brand-700 text-white text-xs font-medium transition-colors shadow-sm">
+          <i data-lucide="file-plus" class="w-3.5 h-3.5"></i>
+          <span>New Note</span>
+        </button>
+        <button id="btn-quick-record" class="flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-xs font-medium transition-colors shadow-sm">
+          <i data-lucide="mic" class="w-3.5 h-3.5"></i>
+          <span>Record Voice</span>
+        </button>
+      </div>
+
+      <!-- Search & Filter Files -->
+      <div class="p-3 border-b border-slate-200 dark:border-github-border">
+        <div class="relative">
+          <i data-lucide="search" class="w-4 h-4 absolute left-2.5 top-2.5 text-slate-400"></i>
+          <input id="search-files" type="text" placeholder="Search notes & audio..." class="w-full text-xs pl-8 pr-3 py-2 rounded-lg border border-slate-200 dark:border-github-border bg-slate-50 dark:bg-github-dark focus:outline-none focus:ring-1 focus:ring-brand-500">
+        </div>
+      </div>
+
+      <!-- Notebook Categories / Tabs -->
+      <div class="px-3 pt-2.5 flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
+        <span class="font-medium">Saved in Repository</span>
+        <span id="repo-item-count" class="text-[11px] px-1.5 py-0.2 rounded bg-slate-100 dark:bg-github-btn">0 items</span>
+      </div>
+
+      <!-- Repository File List -->
+      <div id="file-list-container" class="flex-1 overflow-y-auto p-2 space-y-1">
+        <!-- Loading State -->
+        <div id="file-list-empty" class="p-6 text-center text-xs text-slate-400 dark:text-slate-500">
+          <i data-lucide="cloud-off" class="w-8 h-8 mx-auto mb-2 opacity-50"></i>
+          <p>No repository connected or folder is empty.</p>
+          <button id="btn-setup-conn-hint" class="mt-2 text-brand-600 dark:text-brand-400 hover:underline font-medium">Configure GitHub Token & Repo &rarr;</button>
+        </div>
+      </div>
+
+      <!-- Sidebar Footer: Upload Attachment & Repo Link -->
+      <div class="p-3 border-t border-slate-200 dark:border-github-border bg-slate-50/50 dark:bg-github-dark/40 flex flex-col gap-2">
+        <div class="flex items-center justify-between text-xs">
+          <label class="flex items-center gap-1.5 text-slate-600 dark:text-slate-400 hover:text-brand-600 cursor-pointer font-medium">
+            <i data-lucide="paperclip" class="w-3.5 h-3.5"></i>
+            <span>Upload File to Repo</span>
+            <input type="file" id="file-upload-input" class="hidden">
+          </label>
+          <a id="link-view-repo-github" href="#" target="_blank" class="text-[11px] text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 flex items-center gap-1">
+            <span>Open Repo</span>
+            <i data-lucide="external-link" class="w-3 h-3"></i>
+          </a>
+        </div>
+      </div>
+    </aside>
+
+    <!-- MAIN WORKSPACE -->
+    <main class="flex-1 flex flex-col min-w-0 bg-white dark:bg-github-dark overflow-hidden">
+      
+      <!-- Top Action & Tab Bar -->
+      <div class="border-b border-slate-200 dark:border-github-border bg-slate-50 dark:bg-github-card px-4 py-2 flex items-center justify-between flex-wrap gap-2">
+        <!-- Workspace View Switcher -->
+        <div class="flex items-center p-1 rounded-lg bg-slate-200/70 dark:bg-github-dark text-xs font-medium">
+          <button id="tab-editor" class="flex items-center gap-1.5 px-3 py-1.5 rounded-md transition-all bg-white dark:bg-github-btn text-slate-900 dark:text-white shadow-xs">
+            <i data-lucide="edit-3" class="w-3.5 h-3.5 text-brand-600 dark:text-brand-400"></i>
+            <span>Note Editor</span>
+          </button>
+          <button id="tab-voice" class="flex items-center gap-1.5 px-3 py-1.5 rounded-md transition-all text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white">
+            <i data-lucide="mic" class="w-3.5 h-3.5 text-rose-500"></i>
+            <span>Voice Studio</span>
+            <span id="recording-pill" class="hidden w-2 h-2 rounded-full bg-rose-500 animate-ping ml-1"></span>
+          </button>
+          <button id="tab-notebook-view" class="flex items-center gap-1.5 px-3 py-1.5 rounded-md transition-all text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white">
+            <i data-lucide="layout-grid" class="w-3.5 h-3.5 text-indigo-500"></i>
+            <span>Notebook Viewer</span>
+          </button>
+        </div>
+
+        <!-- Editor Toolbar Actions -->
+        <div id="editor-actions" class="flex items-center gap-2">
+          <!-- Template Selector -->
+          <button id="btn-templates" class="text-xs flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-github-border text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-github-btn">
+            <i data-lucide="sparkles" class="w-3.5 h-3.5 text-amber-500"></i>
+            <span class="hidden sm:inline">Templates</span>
+          </button>
+
+          <!-- Split View Toggle -->
+          <button id="btn-toggle-split" class="text-xs flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-github-border text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-github-btn" title="Toggle Split Preview">
+            <i data-lucide="columns" class="w-3.5 h-3.5"></i>
+            <span class="hidden md:inline">Split Preview</span>
+          </button>
+
+          <!-- Main SAVE TO GITHUB Button -->
+          <button id="btn-save-github" class="flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-brand-600 hover:bg-brand-700 active:scale-95 text-white text-xs font-semibold transition-all shadow-sm shadow-brand-600/30">
+            <i data-lucide="git-commit" class="w-4 h-4"></i>
+            <span>Save to GitHub</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- VIEW 1: NOTE EDITOR WORKSPACE -->
+      <section id="view-editor" class="flex-1 flex flex-col min-h-0">
+        
+        <!-- Note Metadata Header -->
+        <div class="px-6 py-3 border-b border-slate-100 dark:border-github-border/60 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+          <!-- Title & Notebook path -->
+          <div class="flex-1 flex items-center gap-2">
+            <div class="flex items-center gap-1.5 text-xs text-slate-400">
+              <i data-lucide="folder" class="w-3.5 h-3.5"></i>
+              <input id="note-folder" type="text" value="notebooks" placeholder="folder" class="w-24 text-xs font-mono bg-transparent border-b border-dashed border-slate-300 dark:border-slate-600 focus:outline-none focus:border-brand-500 text-slate-600 dark:text-slate-300" title="Notebook Folder in Repo">
+              <span class="text-slate-400">/</span>
+            </div>
+            <input id="note-title" type="text" placeholder="Note Title (e.g. Project Architecture, Daily Reflections...)" class="flex-1 text-base sm:text-lg font-bold bg-transparent border-0 focus:outline-none focus:ring-0 text-slate-900 dark:text-white placeholder-slate-400">
+          </div>
+
+          <!-- Format / Type & Date -->
+          <div class="flex items-center gap-2 text-xs">
+            <select id="note-extension" class="rounded px-2 py-1 text-xs border border-slate-200 dark:border-github-border bg-slate-50 dark:bg-github-card text-slate-600 dark:text-slate-300 focus:outline-none">
+              <option value=".md">Markdown (.md)</option>
+              <option value=".txt">Plain Text (.txt)</option>
+              <option value=".ipynb">Notebook (.ipynb)</option>
+            </select>
+            <span id="draft-status" class="text-[11px] text-slate-400 flex items-center gap-1">
+              <i data-lucide="clock" class="w-3 h-3"></i>
+              <span>Auto-saved locally</span>
+            </span>
+          </div>
+        </div>
+
+        <!-- Markdown Formatting Ribbon -->
+        <div class="px-6 py-1.5 border-b border-slate-100 dark:border-github-border/40 bg-slate-50/50 dark:bg-github-dark/50 flex items-center gap-1 flex-wrap text-xs text-slate-600 dark:text-slate-400">
+          <button type="button" class="md-fmt p-1.5 rounded hover:bg-slate-200 dark:hover:bg-github-btn" data-fmt="bold" title="Bold (**text**)"><i data-lucide="bold" class="w-3.5 h-3.5"></i></button>
+          <button type="button" class="md-fmt p-1.5 rounded hover:bg-slate-200 dark:hover:bg-github-btn" data-fmt="italic" title="Italic (*text*)"><i data-lucide="italic" class="w-3.5 h-3.5"></i></button>
+          <button type="button" class="md-fmt p-1.5 rounded hover:bg-slate-200 dark:hover:bg-github-btn" data-fmt="h1" title="Heading 1"><i data-lucide="heading-1" class="w-3.5 h-3.5"></i></button>
+          <button type="button" class="md-fmt p-1.5 rounded hover:bg-slate-200 dark:hover:bg-github-btn" data-fmt="h2" title="Heading 2"><i data-lucide="heading-2" class="w-3.5 h-3.5"></i></button>
+          <div class="w-px h-4 bg-slate-300 dark:bg-github-border mx-1"></div>
+          <button type="button" class="md-fmt p-1.5 rounded hover:bg-slate-200 dark:hover:bg-github-btn" data-fmt="ul" title="Bullet List"><i data-lucide="list" class="w-3.5 h-3.5"></i></button>
+          <button type="button" class="md-fmt p-1.5 rounded hover:bg-slate-200 dark:hover:bg-github-btn" data-fmt="ol" title="Numbered List"><i data-lucide="list-ordered" class="w-3.5 h-3.5"></i></button>
+          <button type="button" class="md-fmt p-1.5 rounded hover:bg-slate-200 dark:hover:bg-github-btn" data-fmt="check" title="Task List item"><i data-lucide="check-square" class="w-3.5 h-3.5"></i></button>
+          <div class="w-px h-4 bg-slate-300 dark:bg-github-border mx-1"></div>
+          <button type="button" class="md-fmt p-1.5 rounded hover:bg-slate-200 dark:hover:bg-github-btn" data-fmt="code" title="Code Block"><i data-lucide="code" class="w-3.5 h-3.5"></i></button>
+          <button type="button" class="md-fmt p-1.5 rounded hover:bg-slate-200 dark:hover:bg-github-btn" data-fmt="quote" title="Quote"><i data-lucide="quote" class="w-3.5 h-3.5"></i></button>
+          <button type="button" class="md-fmt p-1.5 rounded hover:bg-slate-200 dark:hover:bg-github-btn" data-fmt="table" title="Insert Table"><i data-lucide="table" class="w-3.5 h-3.5"></i></button>
+          <button type="button" class="md-fmt p-1.5 rounded hover:bg-slate-200 dark:hover:bg-github-btn" data-fmt="datetime" title="Insert Timestamp"><i data-lucide="calendar" class="w-3.5 h-3.5"></i></button>
+          <div class="w-px h-4 bg-slate-300 dark:bg-github-border mx-1"></div>
+          <!-- Quick Record Insert inside Note -->
+          <button id="btn-insert-voice" type="button" class="flex items-center gap-1 px-2 py-1 rounded text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 font-medium" title="Attach Voice Memo to Note">
+            <i data-lucide="mic" class="w-3.5 h-3.5"></i>
+            <span>Attach Voice</span>
+          </button>
+        </div>
+
+        <!-- Editor & Preview Split Panes -->
+        <div class="flex-1 flex min-h-0 relative">
+          <!-- Textarea Input Pane -->
+          <div id="editor-pane" class="flex-1 flex flex-col min-h-0 border-r border-slate-100 dark:border-github-border/40">
+            <textarea id="note-content" class="w-full flex-1 p-6 font-mono text-sm leading-relaxed bg-transparent resize-none focus:outline-none text-slate-800 dark:text-slate-100 placeholder-slate-400" placeholder="Type your note in Markdown here...
+# Example Notebook Entry
+- Take quick notes
+- Record your voice and link audio memos
+- Hit 'Save to GitHub' to commit directly to your repository!"></textarea>
+          </div>
+
+          <!-- Live Markdown Preview Pane (Hidden by default on mobile, toggled with Split) -->
+          <div id="preview-pane" class="flex-1 flex-col min-h-0 overflow-y-auto p-6 hidden bg-slate-50/50 dark:bg-github-darker/60">
+            <div class="flex items-center justify-between mb-4 pb-2 border-b border-slate-200 dark:border-github-border text-xs text-slate-400">
+              <span class="font-medium uppercase tracking-wider">Markdown Live Preview</span>
+              <span class="text-[11px]">Rendered View</span>
+            </div>
+            <div id="preview-content" class="markdown-body prose dark:prose-invert max-w-none text-sm">
+              <p class="text-slate-400 italic">Preview appears here as you write...</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Editor Bottom Status Bar -->
+        <div class="px-6 py-2 border-t border-slate-100 dark:border-github-border bg-slate-50 dark:bg-github-card flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
+          <div class="flex items-center gap-4">
+            <span id="stat-words">0 words</span>
+            <span id="stat-chars">0 characters</span>
+            <span id="current-file-sha" class="font-mono text-[11px] text-slate-400 hidden">SHA: new file</span>
+          </div>
+          <div class="flex items-center gap-3">
+            <button id="btn-export-local" class="hover:text-brand-600 dark:hover:text-brand-400 flex items-center gap-1" title="Download note locally">
+              <i data-lucide="download" class="w-3.5 h-3.5"></i>
+              <span>Download</span>
+            </button>
+            <button id="btn-clear-note" class="hover:text-rose-600 dark:hover:text-rose-400 flex items-center gap-1" title="Clear current note">
+              <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+              <span>Clear</span>
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- VIEW 2: VOICE RECORDER STUDIO -->
+      <section id="view-voice" class="flex-1 hidden flex flex-col p-6 overflow-y-auto max-w-4xl mx-auto w-full">
+        
+        <div class="mb-6">
+          <h2 class="text-xl font-bold flex items-center gap-2">
+            <i data-lucide="mic" class="w-6 h-6 text-rose-500"></i>
+            <span>Voice Recording Studio</span>
+          </h2>
+          <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">
+            Record voice memos, meetings, or thoughts and save audio files directly to your GitHub repository notebook.
+          </p>
+        </div>
+
+        <!-- Recording Card -->
+        <div class="rounded-2xl border border-slate-200 dark:border-github-border bg-slate-50/50 dark:bg-github-card p-6 shadow-sm flex flex-col items-center justify-center gap-6">
+          
+          <!-- Audio Visualizer Canvas -->
+          <div class="w-full h-32 rounded-xl bg-slate-900 overflow-hidden relative flex items-center justify-center shadow-inner">
+            <canvas id="voice-canvas" class="w-full h-full block"></canvas>
+            <!-- Idle / Standby Message -->
+            <div id="voice-standby-msg" class="absolute inset-0 flex flex-col items-center justify-center text-slate-400 text-xs pointer-events-none">
+              <i data-lucide="waveform" class="w-8 h-8 mb-1.5 opacity-40"></i>
+              <span>Microphone idle. Press "Start Recording" below.</span>
+            </div>
+          </div>
+
+          <!-- Timer & Status Display -->
+          <div class="flex flex-col items-center">
+            <span id="voice-timer" class="font-mono text-4xl sm:text-5xl font-extrabold tracking-tight text-slate-800 dark:text-white">
+              00:00.00
+            </span>
+            <span id="voice-recording-status" class="text-xs font-medium text-slate-400 mt-1 flex items-center gap-1.5">
+              <span class="w-2 h-2 rounded-full bg-slate-400"></span>
+              Ready to record
+            </span>
+          </div>
+
+          <!-- Record Controls -->
+          <div class="flex items-center gap-3">
+            <!-- Start / Stop Button -->
+            <button id="btn-record-main" class="w-16 h-16 rounded-full bg-rose-600 hover:bg-rose-700 text-white flex items-center justify-center shadow-lg shadow-rose-600/30 transition-transform active:scale-95 focus:outline-none">
+              <i id="icon-record-main" data-lucide="mic" class="w-7 h-7"></i>
+            </button>
+
+            <!-- Pause / Resume Button -->
+            <button id="btn-pause-record" class="w-11 h-11 rounded-full border border-slate-300 dark:border-github-border text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-github-btn flex items-center justify-center disabled:opacity-40 disabled:cursor-not-allowed" disabled>
+              <i id="icon-pause-record" data-lucide="pause" class="w-5 h-5"></i>
+            </button>
+
+            <!-- Reset / Discard Button -->
+            <button id="btn-reset-record" class="w-11 h-11 rounded-full border border-slate-300 dark:border-github-border text-slate-600 dark:text-slate-300 hover:bg-rose-50 dark:hover:bg-rose-950/30 hover:text-rose-600 flex items-center justify-center disabled:opacity-40 disabled:cursor-not-allowed" disabled title="Discard recording">
+              <i data-lucide="trash-2" class="w-5 h-5"></i>
+            </button>
+          </div>
+
+          <!-- Playback Player (Visible once audio is recorded) -->
+          <div id="voice-playback-box" class="w-full hidden flex-col gap-3 p-4 rounded-xl border border-slate-200 dark:border-github-border bg-white dark:bg-github-dark shadow-xs">
+            <div class="flex items-center justify-between text-xs">
+              <span class="font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                <i data-lucide="volume-2" class="w-4 h-4 text-brand-600 dark:text-brand-400"></i>
+                Recording Preview
+              </span>
+              <span id="voice-recorded-size" class="text-slate-400 font-mono text-[11px]">0 KB</span>
+            </div>
+            <!-- Audio element -->
+            <audio id="audio-player" controls class="w-full h-10 outline-none rounded-lg"></audio>
+          </div>
+        </div>
+
+        <!-- Voice Memo Save to GitHub Card -->
+        <div id="voice-save-card" class="mt-6 rounded-2xl border border-slate-200 dark:border-github-border bg-white dark:bg-github-card p-6 shadow-sm flex flex-col gap-4">
+          <h3 class="text-sm font-semibold flex items-center gap-2">
+            <i data-lucide="cloud-upload" class="w-4 h-4 text-brand-600 dark:text-brand-400"></i>
+            <span>Save Voice Memo to Repository</span>
+          </h3>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+            <div>
+              <label class="block font-medium text-slate-600 dark:text-slate-400 mb-1">Voice Memo Title / Filename</label>
+              <input id="voice-filename" type="text" placeholder="voice_note_20261116" class="w-full p-2.5 rounded-lg border border-slate-200 dark:border-github-border bg-slate-50 dark:bg-github-dark focus:outline-none focus:ring-1 focus:ring-brand-500 font-mono">
+            </div>
+            <div>
+              <label class="block font-medium text-slate-600 dark:text-slate-400 mb-1">Target Folder in Repo</label>
+              <input id="voice-folder" type="text" value="notebooks/audio" class="w-full p-2.5 rounded-lg border border-slate-200 dark:border-github-border bg-slate-50 dark:bg-github-dark focus:outline-none focus:ring-1 focus:ring-brand-500 font-mono">
+            </div>
+          </div>
+
+          <div>
+            <label class="block font-medium text-slate-600 dark:text-slate-400 mb-1 text-xs">Optional Description / Transcript / Notes</label>
+            <textarea id="voice-notes" rows="2" placeholder="Key points discussed, speaker names, summary..." class="w-full p-2.5 text-xs rounded-lg border border-slate-200 dark:border-github-border bg-slate-50 dark:bg-github-dark focus:outline-none focus:ring-1 focus:ring-brand-500"></textarea>
+          </div>
+
+          <div class="flex items-center justify-between pt-2 flex-wrap gap-2">
+            <label class="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-400 cursor-pointer">
+              <input id="voice-create-companion-note" type="checkbox" checked class="rounded border-slate-300 text-brand-600 focus:ring-brand-500">
+              <span>Also generate a companion Markdown notebook note with audio playback link</span>
+            </label>
+
+            <div class="flex items-center gap-2">
+              <button id="btn-download-audio-local" class="text-xs px-3 py-2 rounded-lg border border-slate-200 dark:border-github-border text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-github-btn flex items-center gap-1.5" disabled>
+                <i data-lucide="download" class="w-3.5 h-3.5"></i>
+                <span>Download Audio</span>
+              </button>
+              <button id="btn-save-voice-github" class="text-xs px-4 py-2 rounded-lg bg-brand-600 hover:bg-brand-700 text-white font-medium flex items-center gap-1.5 shadow-sm shadow-brand-600/30 disabled:opacity-40 disabled:cursor-not-allowed" disabled>
+                <i data-lucide="upload-cloud" class="w-4 h-4"></i>
+                <span>Save Voice to GitHub</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- VIEW 3: NOTEBOOK VIEWER (Repository Explorer / Grid) -->
+      <section id="view-notebook-grid" class="flex-1 hidden flex flex-col p-6 overflow-y-auto">
+        <div class="flex items-center justify-between mb-6 flex-wrap gap-3">
+          <div>
+            <h2 class="text-xl font-bold flex items-center gap-2">
+              <i data-lucide="book" class="w-6 h-6 text-indigo-500"></i>
+              <span>Notebook Repository Vault</span>
+            </h2>
+            <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">
+              Browse all stored notes, audio files, and documents saved on GitHub.
+            </p>
+          </div>
+
+          <div class="flex items-center gap-2">
+            <button id="btn-filter-all" class="px-2.5 py-1 text-xs rounded-md bg-brand-600 text-white font-medium">All Files</button>
+            <button id="btn-filter-notes" class="px-2.5 py-1 text-xs rounded-md border border-slate-200 dark:border-github-border hover:bg-slate-100 dark:hover:bg-github-btn">Notes (.md/.txt)</button>
+            <button id="btn-filter-audio" class="px-2.5 py-1 text-xs rounded-md border border-slate-200 dark:border-github-border hover:bg-slate-100 dark:hover:bg-github-btn">Audio (.webm/.wav)</button>
+          </div>
+        </div>
+
+        <!-- Grid Container -->
+        <div id="notebook-grid-container" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <!-- Populated by JS -->
+          <div class="col-span-full text-center py-12 text-slate-400">
+            <i data-lucide="folder-search" class="w-12 h-12 mx-auto mb-2 opacity-50"></i>
+            <p class="text-sm">Connect your GitHub repository to view and manage notebooks.</p>
+          </div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- MODAL: GITHUB SETTINGS & CONFIGURATION -->
+  <div id="modal-settings" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-white dark:bg-github-card border border-slate-200 dark:border-github-border w-full max-w-lg rounded-2xl shadow-2xl flex flex-col max-h-[90vh] overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+      
+      <!-- Modal Header -->
+      <div class="p-4 border-b border-slate-200 dark:border-github-border flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <i data-lucide="github" class="w-5 h-5"></i>
+          <h3 class="font-bold text-sm">GitHub Repository Settings</h3>
+        </div>
+        <button id="btn-close-settings" class="p-1 rounded text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+      </div>
+
+      <!-- Modal Body -->
+      <div class="p-6 space-y-4 overflow-y-auto text-xs">
+        
+        <!-- Quick Instructions Card -->
+        <div class="p-3.5 rounded-xl bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-900/50 text-blue-900 dark:text-blue-200 space-y-1.5 leading-relaxed">
+          <div class="font-semibold flex items-center gap-1.5">
+            <i data-lucide="info" class="w-4 h-4 text-blue-500"></i>
+            <span>How to connect your GitHub Repository:</span>
+          </div>
+          <ol class="list-decimal list-inside space-y-1 pl-1 text-[11px]">
+            <li>Go to <a href="https://github.com/settings/tokens" target="_blank" class="underline font-semibold hover:text-blue-600">GitHub &rarr; Settings &rarr; Personal access tokens</a> (Classic or Fine-Grained).</li>
+            <li>Generate a token with <code class="bg-blue-100 dark:bg-blue-900/60 px-1 py-0.5 rounded font-mono">repo</code> permissions (read & write repository contents).</li>
+            <li>Paste your token and repository details below. Your token stays in your browser's <code class="font-mono">localStorage</code> only!</li>
+          </ol>
+        </div>
+
+        <!-- Token Input -->
+        <div>
+          <label class="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
+            GitHub Personal Access Token (PAT) <span class="text-rose-500">*</span>
+          </label>
+          <div class="relative">
+            <input id="cfg-token" type="password" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx" class="w-full p-2.5 rounded-lg border border-slate-200 dark:border-github-border bg-slate-50 dark:bg-github-dark font-mono text-xs focus:ring-1 focus:ring-brand-500 focus:outline-none pr-10">
+            <button id="btn-toggle-token-eye" type="button" class="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
+              <i data-lucide="eye" class="w-4 h-4"></i>
+            </button>
+          </div>
+        </div>
+
+        <!-- Repo Owner & Name -->
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
+              GitHub Username / Org <span class="text-rose-500">*</span>
+            </label>
+            <input id="cfg-owner" type="text" placeholder="e.g. yourusername" class="w-full p-2.5 rounded-lg border border-slate-200 dark:border-github-border bg-slate-50 dark:bg-github-dark font-mono text-xs focus:ring-1 focus:ring-brand-500 focus:outline-none">
+          </div>
+          <div>
+            <label class="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
+              Repository Name <span class="text-rose-500">*</span>
+            </label>
+            <input id="cfg-repo" type="text" placeholder="e.g. my-vault" class="w-full p-2.5 rounded-lg border border-slate-200 dark:border-github-border bg-slate-50 dark:bg-github-dark font-mono text-xs focus:ring-1 focus:ring-brand-500 focus:outline-none">
+          </div>
+        </div>
+
+        <!-- Branch & Base Folder -->
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
+              Branch Name
+            </label>
+            <input id="cfg-branch" type="text" value="main" placeholder="main" class="w-full p-2.5 rounded-lg border border-slate-200 dark:border-github-border bg-slate-50 dark:bg-github-dark font-mono text-xs focus:ring-1 focus:ring-brand-500 focus:outline-none">
+          </div>
+          <div>
+            <label class="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
+              Base Vault Directory
+            </label>
+            <input id="cfg-dir" type="text" value="notebooks" placeholder="notebooks" class="w-full p-2.5 rounded-lg border border-slate-200 dark:border-github-border bg-slate-50 dark:bg-github-dark font-mono text-xs focus:ring-1 focus:ring-brand-500 focus:outline-none">
+          </div>
+        </div>
+
+        <!-- Connection Test Status Result Box -->
+        <div id="cfg-test-result" class="hidden p-3 rounded-lg text-xs"></div>
+
+      </div>
+
+      <!-- Modal Footer -->
+      <div class="p-4 border-t border-slate-200 dark:border-github-border bg-slate-50 dark:bg-github-card flex items-center justify-between">
+        <button id="btn-test-connection" class="text-xs font-medium px-3 py-2 rounded-lg border border-slate-200 dark:border-github-border text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-github-btn flex items-center gap-1.5">
+          <i data-lucide="zap" class="w-3.5 h-3.5 text-amber-500"></i>
+          <span>Test Connection</span>
+        </button>
+
+        <div class="flex items-center gap-2">
+          <button id="btn-clear-settings" class="text-xs text-rose-500 hover:text-rose-600 px-2 py-1">
+            Disconnect
+          </button>
+          <button id="btn-save-settings" class="text-xs font-semibold px-4 py-2 rounded-lg bg-brand-600 hover:bg-brand-700 text-white shadow-sm transition-colors">
+            Save Settings
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: TEMPLATES -->
+  <div id="modal-templates" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-white dark:bg-github-card border border-slate-200 dark:border-github-border w-full max-w-md rounded-2xl shadow-2xl p-5">
+      <div class="flex items-center justify-between mb-4 pb-2 border-b border-slate-200 dark:border-github-border">
+        <h3 class="font-bold text-sm flex items-center gap-1.5">
+          <i data-lucide="sparkles" class="w-4 h-4 text-amber-500"></i>
+          <span>Choose a Notebook Template</span>
+        </h3>
+        <button id="btn-close-templates" class="p-1 rounded text-slate-400 hover:text-slate-600">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+      </div>
+
+      <div class="space-y-2 text-xs">
+        <button class="template-item w-full p-3 rounded-xl border border-slate-200 dark:border-github-border text-left hover:border-brand-500 hover:bg-brand-50/40 dark:hover:bg-brand-950/20 transition-all flex items-start gap-3" data-template="meeting">
+          <div class="p-2 rounded-lg bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300"><i data-lucide="users" class="w-4 h-4"></i></div>
+          <div>
+            <div class="font-bold">Meeting Notes</div>
+            <div class="text-[11px] text-slate-500 dark:text-slate-400">Attendees, agenda items, key decisions, action items.</div>
+          </div>
+        </button>
+
+        <button class="template-item w-full p-3 rounded-xl border border-slate-200 dark:border-github-border text-left hover:border-brand-500 hover:bg-brand-50/40 dark:hover:bg-brand-950/20 transition-all flex items-start gap-3" data-template="journal">
+          <div class="p-2 rounded-lg bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300"><i data-lucide="sun" class="w-4 h-4"></i></div>
+          <div>
+            <div class="font-bold">Daily Journal / Diary</div>
+            <div class="text-[11px] text-slate-500 dark:text-slate-400">Highlights of today, lessons learned, gratitude, tomorrow's plan.</div>
+          </div>
+        </button>
+
+        <button class="template-item w-full p-3 rounded-xl border border-slate-200 dark:border-github-border text-left hover:border-brand-500 hover:bg-brand-50/40 dark:hover:bg-brand-950/20 transition-all flex items-start gap-3" data-template="voice-memo">
+          <div class="p-2 rounded-lg bg-rose-100 text-rose-700 dark:bg-rose-900/50 dark:text-rose-300"><i data-lucide="mic" class="w-4 h-4"></i></div>
+          <div>
+            <div class="font-bold">Voice Memo Summary</div>
+            <div class="text-[11px] text-slate-500 dark:text-slate-400">Audio reference link, timestamped thoughts, action steps.</div>
+          </div>
+        </button>
+
+        <button class="template-item w-full p-3 rounded-xl border border-slate-200 dark:border-github-border text-left hover:border-brand-500 hover:bg-brand-50/40 dark:hover:bg-brand-950/20 transition-all flex items-start gap-3" data-template="research">
+          <div class="p-2 rounded-lg bg-purple-100 text-purple-700 dark:bg-purple-900/50 dark:text-purple-300"><i data-lucide="brain" class="w-4 h-4"></i></div>
+          <div>
+            <div class="font-bold">Research & Code Notebook</div>
+            <div class="text-[11px] text-slate-500 dark:text-slate-400">Hypothesis, code snippets, benchmarks, citations.</div>
+          </div>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- TOAST NOTIFICATIONS CONTAINER -->
+  <div id="toast-container" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 pointer-events-none"></div>
+
+  <!-- JAVASCRIPT APPLICATION LOGIC -->
+  <script>
+    // --- APP STATE & CONFIGURATION ---
+    const APP_CONFIG_KEY = 'gitnotebook_config';
+    const DRAFT_NOTE_KEY = 'gitnotebook_draft';
+
+    const state = {
+      config: {
+        token: '',
+        owner: '',
+        repo: '',
+        branch: 'main',
+        baseDir: 'notebooks'
+      },
+      currentFile: {
+        path: '',
+        sha: null,
+        title: '',
+        content: '',
+        isSaved: true
+      },
+      repoFiles: [],
+      // Voice recording state
+      recorder: null,
+      audioChunks: [],
+      audioBlob: null,
+      audioUrl: null,
+      audioStream: null,
+      audioContext: null,
+      analyser: null,
+      canvasAnimId: null,
+      recordStartTime: 0,
+      recordTimerInterval: null,
+      isRecording: false,
+      isPaused: false
+    };
+
+    // --- TEMPLATES ---
+    const TEMPLATES = {
+      meeting: `# Meeting Notes: [Topic]
+**Date:** ${new Date().toLocaleDateString()} | **Time:** ${new Date().toLocaleTimeString()}
+**Attendees:** 
+- @Person 1
+- @Person 2
+
+---
+## 🎯 Objectives
+1. Goal 1
+2. Goal 2
+
+## 📝 Key Discussion Points
+- 
+
+## ✅ Action Items
+- [ ] Task 1 - Assigned to @Person
+- [ ] Task 2 - Due date: 
+`,
+      journal: `# Daily Journal - ${new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+
+### ☀️ Morning Reflection & Intentions
+- **Top 3 Priorities today:**
+  1. 
+  2. 
+  3. 
+
+### 💡 Ideas & Insights
+- 
+
+### 🌙 Evening Gratitude & Wrap-up
+- What went well today?
+- What did I learn?
+`,
+      'voice-memo': `# Voice Memo Notes: [Title]
+**Recorded:** ${new Date().toLocaleString()}
+
+> 🎙️ **Audio Recording**: [voice_note_${Date.now()}.webm](notebooks/audio/voice_note_${Date.now()}.webm)
+
+---
+### 📌 Executive Summary
+- 
+
+### ⏱️ Timestamped Breakdown
+- **00:15** - Introduction and context
+- **01:30** - Main breakthrough or discussion point
+
+### 🚀 Next Steps
+- [ ] Review recording
+`,
+      research: `# Research & Study Notes: [Subject]
+**Subject:** 
+**Tags:** #research #notes
+
+## 🔬 Background & Problem
+- 
+
+## 💻 Code & Implementation
+\`\`\`javascript
+// Sample code snippet
+function analyze() {
+  return true;
+}
+\`\`\`
+
+## 📊 Observations & Results
+- 
+
+## 📚 References & Links
+- [Documentation](https://github.com)
+`
+    };
+
+    // --- DOM ELEMENTS ---
+    const el = {
+      sidebar: document.getElementById('sidebar'),
+      btnToggleSidebar: document.getElementById('btn-toggle-sidebar'),
+      btnCloseSidebar: document.getElementById('btn-close-sidebar'),
+      btnThemeToggle: document.getElementById('btn-theme-toggle'),
+      btnOpenSettings: document.getElementById('btn-open-settings'),
+      connIndicator: document.getElementById('conn-indicator'),
+      connText: document.getElementById('conn-text'),
+      btnRefreshRepo: document.getElementById('btn-refresh-repo'),
+      searchFiles: document.getElementById('search-files'),
+      fileListContainer: document.getElementById('file-list-container'),
+      repoItemCount: document.getElementById('repo-item-count'),
+      fileUploadInput: document.getElementById('file-upload-input'),
+      linkViewRepoGithub: document.getElementById('link-view-repo-github'),
+      // Tabs
+      tabEditor: document.getElementById('tab-editor'),
+      tabVoice: document.getElementById('tab-voice'),
+      tabNotebookView: document.getElementById('tab-notebook-view'),
+      viewEditor: document.getElementById('view-editor'),
+      viewVoice: document.getElementById('view-voice'),
+      viewNotebookGrid: document.getElementById('view-notebook-grid'),
+      editorActions: document.getElementById('editor-actions'),
+      recordingPill: document.getElementById('recording-pill'),
+      // Editor elements
+      noteFolder: document.getElementById('note-folder'),
+      noteTitle: document.getElementById('note-title'),
+      noteExtension: document.getElementById('note-extension'),
+      noteContent: document.getElementById('note-content'),
+      editorPane: document.getElementById('editor-pane'),
+      previewPane: document.getElementById('preview-pane'),
+      previewContent: document.getElementById('preview-content'),
+      btnToggleSplit: document.getElementById('btn-toggle-split'),
+      btnSaveGithub: document.getElementById('btn-save-github'),
+      btnNewNote: document.getElementById('btn-new-note'),
+      btnQuickRecord: document.getElementById('btn-quick-record'),
+      btnInsertVoice: document.getElementById('btn-insert-voice'),
+      btnTemplates: document.getElementById('btn-templates'),
+      btnExportLocal: document.getElementById('btn-export-local'),
+      btnClearNote: document.getElementById('btn-clear-note'),
+      draftStatus: document.getElementById('draft-status'),
+      statWords: document.getElementById('stat-words'),
+      statChars: document.getElementById('stat-chars'),
+      currentFileSha: document.getElementById('current-file-sha'),
+      // Voice Studio elements
+      voiceCanvas: document.getElementById('voice-canvas'),
+      voiceStandbyMsg: document.getElementById('voice-standby-msg'),
+      voiceTimer: document.getElementById('voice-timer'),
+      voiceRecordingStatus: document.getElementById('voice-recording-status'),
+      btnRecordMain: document.getElementById('btn-record-main'),
+      iconRecordMain: document.getElementById('icon-record-main'),
+      btnPauseRecord: document.getElementById('btn-pause-record'),
+      iconPauseRecord: document.getElementById('icon-pause-record'),
+      btnResetRecord: document.getElementById('btn-reset-record'),
+      voicePlaybackBox: document.getElementById('voice-playback-box'),
+      audioPlayer: document.getElementById('audio-player'),
+      voiceRecordedSize: document.getElementById('voice-recorded-size'),
+      voiceFilename: document.getElementById('voice-filename'),
+      voiceFolder: document.getElementById('voice-folder'),
+      voiceNotes: document.getElementById('voice-notes'),
+      voiceCreateCompanionNote: document.getElementById('voice-create-companion-note'),
+      btnDownloadAudioLocal: document.getElementById('btn-download-audio-local'),
+      btnSaveVoiceGithub: document.getElementById('btn-save-voice-github'),
+      // Notebook Grid
+      notebookGridContainer: document.getElementById('notebook-grid-container'),
+      btnFilterAll: document.getElementById('btn-filter-all'),
+      btnFilterNotes: document.getElementById('btn-filter-notes'),
+      btnFilterAudio: document.getElementById('btn-filter-audio'),
+      // Settings Modal
+      modalSettings: document.getElementById('modal-settings'),
+      btnCloseSettings: document.getElementById('btn-close-settings'),
+      cfgToken: document.getElementById('cfg-token'),
+      cfgOwner: document.getElementById('cfg-owner'),
+      cfgRepo: document.getElementById('cfg-repo'),
+      cfgBranch: document.getElementById('cfg-branch'),
+      cfgDir: document.getElementById('cfg-dir'),
+      btnToggleTokenEye: document.getElementById('btn-toggle-token-eye'),
+      btnTestConnection: document.getElementById('btn-test-connection'),
+      cfgTestResult: document.getElementById('cfg-test-result'),
+      btnSaveSettings: document.getElementById('btn-save-settings'),
+      btnClearSettings: document.getElementById('btn-clear-settings'),
+      btnSetupConnHint: document.getElementById('btn-setup-conn-hint'),
+      // Template Modal
+      modalTemplates: document.getElementById('modal-templates'),
+      btnCloseTemplates: document.getElementById('btn-close-templates'),
+      toastContainer: document.getElementById('toast-container')
+    };
+
+    // --- INITIALIZATION ---
+    function init() {
+      // 1. Theme Setup
+      const savedTheme = localStorage.getItem('theme') || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+      if (savedTheme === 'dark') {
+        document.documentElement.classList.add('dark');
+      } else {
+        document.documentElement.classList.remove('dark');
+      }
+
+      // 2. Load Config from localStorage
+      loadConfig();
+
+      // 3. Load Draft Note from localStorage
+      loadDraft();
+
+      // 4. Update Word & Char stats
+      updateEditorStats();
+
+      // 5. Setup Event Listeners
+      setupEventListeners();
+
+      // 6. Refresh icons
+      lucide.createIcons();
+
+      // 7. If configured, refresh repo files automatically
+      if (state.config.token && state.config.owner && state.config.repo) {
+        updateConnectionUI(true, `${state.config.owner}/${state.config.repo}`);
+        fetchRepoFiles();
+      } else {
+        updateConnectionUI(false, 'Not Connected');
+      }
+    }
+
+    // --- CONFIGURATION MANAGEMENT ---
+    function loadConfig() {
+      try {
+        const raw = localStorage.getItem(APP_CONFIG_KEY);
+        if (raw) {
+          state.config = { ...state.config, ...JSON.parse(raw) };
+          el.cfgToken.value = state.config.token || '';
+          el.cfgOwner.value = state.config.owner || '';
+          el.cfgRepo.value = state.config.repo || '';
+          el.cfgBranch.value = state.config.branch || 'main';
+          el.cfgDir.value = state.config.baseDir || 'notebooks';
+          el.noteFolder.value = state.config.baseDir || 'notebooks';
+        }
+      } catch (e) {
+        console.error('Error loading config', e);
+      }
+    }
+
+    function saveConfig() {
+      state.config.token = el.cfgToken.value.trim();
+      state.config.owner = el.cfgOwner.value.trim();
+      state.config.repo = el.cfgRepo.value.trim();
+      state.config.branch = el.cfgBranch.value.trim() || 'main';
+      state.config.baseDir = el.cfgDir.value.trim() || 'notebooks';
+
+      if (!state.config.token || !state.config.owner || !state.config.repo) {
+        showToast('Please fill in Token, Owner, and Repo Name', 'error');
+        return false;
+      }
+
+      localStorage.setItem(APP_CONFIG_KEY, JSON.stringify(state.config));
+      el.noteFolder.value = state.config.baseDir;
+      updateConnectionUI(true, `${state.config.owner}/${state.config.repo}`);
+      showToast('GitHub configuration saved!', 'success');
+      el.modalSettings.classList.add('hidden');
+      fetchRepoFiles();
+      return true;
+    }
+
+    function clearConfig() {
+      localStorage.removeItem(APP_CONFIG_KEY);
+      state.config = { token: '', owner: '', repo: '', branch: 'main', baseDir: 'notebooks' };
+      el.cfgToken.value = '';
+      el.cfgOwner.value = '';
+      el.cfgRepo.value = '';
+      el.cfgBranch.value = 'main';
+      el.cfgDir.value = 'notebooks';
+      updateConnectionUI(false, 'Not Connected');
+      state.repoFiles = [];
+      renderFileList();
+      renderNotebookGrid();
+      showToast('GitHub configuration disconnected', 'info');
+      el.modalSettings.classList.add('hidden');
+    }
+
+    function updateConnectionUI(connected, label) {
+      if (connected) {
+        el.connIndicator.className = 'w-2.5 h-2.5 rounded-full bg-emerald-500';
+        el.connText.textContent = label;
+        el.linkViewRepoGithub.href = `https://github.com/${state.config.owner}/${state.config.repo}/tree/${state.config.branch}`;
+        el.linkViewRepoGithub.classList.remove('pointer-events-none', 'opacity-50');
+      } else {
+        el.connIndicator.className = 'w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse';
+        el.connText.textContent = label;
+        el.linkViewRepoGithub.href = '#';
+        el.linkViewRepoGithub.classList.add('pointer-events-none', 'opacity-50');
+      }
+    }
+
+    // --- GITHUB API HELPERS ---
+    function getApiHeaders() {
+      return {
+        'Authorization': `Bearer ${state.config.token}`,
+        'Accept': 'application/vnd.github.v3+json',
+        'X-GitHub-Api-Version': '2022-11-28'
+      };
+    }
+
+    // Unicode safe Base64 encoder/decoder
+    function utf8ToBase64(str) {
+      const bytes = new TextEncoder().encode(str);
+      let binary = '';
+      const len = bytes.byteLength;
+      for (let i = 0; i < len; i++) {
+        binary += String.fromCharCode(bytes[i]);
+      }
+      return btoa(binary);
+    }
+
+    function base64ToUtf8(base64) {
+      const binary = atob(base64.replace(/\s/g, ''));
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) {
+        bytes[i] = binary.charCodeAt(i);
+      }
+      return new TextDecoder().decode(bytes);
+    }
+
+    function blobToBase64(blob) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          const res = reader.result;
+          const base64 = res.split(',')[1];
+          resolve(base64);
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+      });
+    }
+
+    // Test GitHub Connection
+    async function testGitHubConnection() {
+      const token = el.cfgToken.value.trim();
+      const owner = el.cfgOwner.value.trim();
+      const repo = el.cfgRepo.value.trim();
+      const branch = el.cfgBranch.value.trim() || 'main';
+
+      if (!token || !owner || !repo) {
+        showTestResult('Please enter token, owner, and repository name.', false);
+        return;
+      }
+
+      showTestResult('Connecting to GitHub API...', 'pending');
+
+      try {
+        const url = `https://api.github.com/repos/${owner}/${repo}`;
+        const res = await fetch(url, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Accept': 'application/vnd.github.v3+json'
+          }
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          showTestResult(`Connected successfully to ${data.full_name} (${data.private ? 'Private' : 'Public'} Repo)!`, true);
+        } else if (res.status === 401) {
+          showTestResult('Authentication failed. Bad or expired token.', false);
+        } else if (res.status === 404) {
+          showTestResult(`Repository "${owner}/${repo}" not found or token lacks access permissions.`, false);
+        } else {
+          const err = await res.json().catch(() => ({}));
+          showTestResult(`GitHub error ${res.status}: ${err.message || res.statusText}`, false);
+        }
+      } catch (err) {
+        showTestResult(`Network error: ${err.message}. Check your internet connection.`, false);
+      }
+    }
+
+    function showTestResult(msg, success) {
+      el.cfgTestResult.classList.remove('hidden');
+      if (success === 'pending') {
+        el.cfgTestResult.className = 'p-3 rounded-lg text-xs bg-slate-100 dark:bg-github-btn text-slate-700 dark:text-slate-300 flex items-center gap-2';
+        el.cfgTestResult.innerHTML = `<span class="w-3 h-3 border-2 border-brand-500 border-t-transparent rounded-full animate-spin"></span> <span>${msg}</span>`;
+      } else if (success) {
+        el.cfgTestResult.className = 'p-3 rounded-lg text-xs bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-900 text-emerald-800 dark:text-emerald-200';
+        el.cfgTestResult.innerHTML = `<strong>Success:</strong> ${msg}`;
+      } else {
+        el.cfgTestResult.className = 'p-3 rounded-lg text-xs bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 text-rose-800 dark:text-rose-200';
+        el.cfgTestResult.innerHTML = `<strong>Error:</strong> ${msg}`;
+      }
+    }
+
+    // Fetch repository contents recursively or at baseDir
+    async function fetchRepoFiles() {
+      if (!state.config.token || !state.config.owner || !state.config.repo) return;
+
+      el.btnRefreshRepo.classList.add('animate-spin');
+      const baseDir = (state.config.baseDir || 'notebooks').replace(/^\/+|\/+$/g, '');
+
+      try {
+        // Use Git Trees API with recursive=1 to list all files in the branch!
+        const treeUrl = `https://api.github.com/repos/${state.config.owner}/${state.config.repo}/git/trees/${state.config.branch}?recursive=1`;
+        const res = await fetch(treeUrl, { headers: getApiHeaders() });
+
+        if (res.ok) {
+          const data = await res.json();
+          // Filter files in baseDir or show all
+          let files = data.tree.filter(item => item.type === 'blob');
+          if (baseDir) {
+            files = files.filter(item => item.path.startsWith(baseDir) || item.path.includes('notebook') || item.path.endsWith('.md') || item.path.endsWith('.webm'));
+          }
+          state.repoFiles = files;
+          renderFileList();
+          renderNotebookGrid();
+        } else if (res.status === 404) {
+          // Repo might be empty or tree not found; fallback to contents API
+          await fetchContentsFallback(baseDir);
+        } else {
+          console.warn('Tree fetch failed', res.status);
+        }
+      } catch (err) {
+        console.error('Fetch repo files error', err);
+      } finally {
+        el.btnRefreshRepo.classList.remove('animate-spin');
+      }
+    }
+
+    async function fetchContentsFallback(dir) {
+      try {
+        const url = `https://api.github.com/repos/${state.config.owner}/${state.config.repo}/contents/${dir}?ref=${state.config.branch}`;
+        const res = await fetch(url, { headers: getApiHeaders() });
+        if (res.ok) {
+          const items = await res.json();
+          state.repoFiles = (Array.isArray(items) ? items : [items]).map(i => ({
+            path: i.path,
+            sha: i.sha,
+            size: i.size,
+            type: i.type
+          }));
+          renderFileList();
+          renderNotebookGrid();
+        } else {
+          state.repoFiles = [];
+          renderFileList();
+          renderNotebookGrid();
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    // Save File (Markdown / Text / JSON) to GitHub
+    async function saveFileToGitHub(path, contentStr, commitMessage = null) {
+      if (!state.config.token || !state.config.owner || !state.config.repo) {
+        showToast('Please configure GitHub token and repository first', 'error');
+        el.modalSettings.classList.remove('hidden');
+        return false;
+      }
+
+      const cleanPath = path.replace(/^\/+/, '');
+      const defaultMsg = commitMessage || `Update note: ${cleanPath.split('/').pop()}`;
+      const base64Content = utf8ToBase64(contentStr);
+
+      // Check current SHA if not cached
+      let sha = state.currentFile.path === cleanPath ? state.currentFile.sha : null;
+      if (!sha) {
+        try {
+          const checkUrl = `https://api.github.com/repos/${state.config.owner}/${state.config.repo}/contents/${cleanPath}?ref=${state.config.branch}`;
+          const checkRes = await fetch(checkUrl, { headers: getApiHeaders() });
+          if (checkRes.ok) {
+            const checkData = await checkRes.json();
+            sha = checkData.sha;
+          }
+        } catch (e) {
+          console.log('File does not exist yet', e);
+        }
+      }
+
+      const putUrl = `https://api.github.com/repos/${state.config.owner}/${state.config.repo}/contents/${cleanPath}`;
+      const putBody = {
+        message: defaultMsg,
+        content: base64Content,
+        branch: state.config.branch,
+        ...(sha ? { sha } : {})
+      };
+
+      const res = await fetch(putUrl, {
+        method: 'PUT',
+        headers: {
+          ...getApiHeaders(),
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(putBody)
+      });
+
+      if (res.ok) {
+        const result = await res.json();
+        state.currentFile.sha = result.content ? result.content.sha : null;
+        state.currentFile.path = cleanPath;
+        state.currentFile.isSaved = true;
+        updateShaIndicator(state.currentFile.sha);
+        fetchRepoFiles(); // Refresh file listing
+        return result;
+      } else {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.message || `HTTP ${res.status}`);
+      }
+    }
+
+    // Save Binary File (Voice memo / audio / image) to GitHub
+    async function saveBinaryToGitHub(path, base64Data, commitMessage) {
+      if (!state.config.token || !state.config.owner || !state.config.repo) {
+        showToast('Please configure GitHub token and repository first', 'error');
+        el.modalSettings.classList.remove('hidden');
+        return false;
+      }
+
+      const cleanPath = path.replace(/^\/+/, '');
+      const defaultMsg = commitMessage || `Add voice recording: ${cleanPath.split('/').pop()}`;
+
+      // Check SHA if exists
+      let sha = null;
+      try {
+        const checkUrl = `https://api.github.com/repos/${state.config.owner}/${state.config.repo}/contents/${cleanPath}?ref=${state.config.branch}`;
+        const checkRes = await fetch(checkUrl, { headers: getApiHeaders() });
+        if (checkRes.ok) {
+          const checkData = await checkRes.json();
+          sha = checkData.sha;
+        }
+      } catch (e) {}
+
+      const putUrl = `https://api.github.com/repos/${state.config.owner}/${state.config.repo}/contents/${cleanPath}`;
+      const putBody = {
+        message: defaultMsg,
+        content: base64Data,
+        branch: state.config.branch,
+        ...(sha ? { sha } : {})
+      };
+
+      const res = await fetch(putUrl, {
+        method: 'PUT',
+        headers: {
+          ...getApiHeaders(),
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(putBody)
+      });
+
+      if (res.ok) {
+        const result = await res.json();
+        fetchRepoFiles();
+        return result;
+      } else {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.message || `HTTP ${res.status}`);
+      }
+    }
+
+    // Fetch single file from GitHub by path
+    async function fetchFileContent(filePath) {
+      const url = `https://api.github.com/repos/${state.config.owner}/${state.config.repo}/contents/${filePath}?ref=${state.config.branch}`;
+      const res = await fetch(url, { headers: getApiHeaders() });
+      if (!res.ok) throw new Error(`Failed to load file (${res.status})`);
+      const data = await res.json();
+      return data;
+    }
+
+    // Fetch raw blob for audio / binary
+    async function fetchRawBlob(filePath) {
+      const url = `https://api.github.com/repos/${state.config.owner}/${state.config.repo}/contents/${filePath}?ref=${state.config.branch}`;
+      const res = await fetch(url, {
+        headers: {
+          ...getApiHeaders(),
+          'Accept': 'application/vnd.github.raw'
+        }
+      });
+      if (!res.ok) throw new Error(`Failed to load raw file (${res.status})`);
+      return await res.blob();
+    }
+
+    // --- NOTE EDITOR LOGIC ---
+    function updateEditorStats() {
+      const text = el.noteContent.value || '';
+      const chars = text.length;
+      const words = text.trim() ? text.trim().split(/\s+/).length : 0;
+      el.statChars.textContent = `${chars} characters`;
+      el.statWords.textContent = `${words} words`;
+
+      // Live Markdown Preview
+      if (!el.previewPane.classList.contains('hidden')) {
+        renderMarkdownPreview();
+      }
+
+      // Save local draft
+      saveDraft();
+    }
+
+    function renderMarkdownPreview() {
+      const text = el.noteContent.value || '';
+      if (!text.trim()) {
+        el.previewContent.innerHTML = '<p class="text-slate-400 italic">Preview appears here as you write...</p>';
+        return;
+      }
+      const rawHtml = marked.parse(text);
+      const cleanHtml = DOMPurify.sanitize(rawHtml);
+      el.previewContent.innerHTML = cleanHtml;
+    }
+
+    function updateShaIndicator(sha) {
+      if (sha) {
+        el.currentFileSha.textContent = `SHA: ${sha.slice(0, 7)}`;
+        el.currentFileSha.classList.remove('hidden');
+      } else {
+        el.currentFileSha.classList.add('hidden');
+      }
+    }
+
+    function saveDraft() {
+      const draft = {
+        folder: el.noteFolder.value,
+        title: el.noteTitle.value,
+        ext: el.noteExtension.value,
+        content: el.noteContent.value,
+        sha: state.currentFile.sha,
+        path: state.currentFile.path,
+        timestamp: Date.now()
+      };
+      localStorage.setItem(DRAFT_NOTE_KEY, JSON.stringify(draft));
+      el.draftStatus.innerHTML = `<i data-lucide="check" class="w-3 h-3 text-emerald-500"></i><span>Draft saved locally</span>`;
+      lucide.createIcons();
+    }
+
+    function loadDraft() {
+      try {
+        const raw = localStorage.getItem(DRAFT_NOTE_KEY);
+        if (raw) {
+          const draft = JSON.parse(raw);
+          el.noteFolder.value = draft.folder || 'notebooks';
+          el.noteTitle.value = draft.title || '';
+          el.noteExtension.value = draft.ext || '.md';
+          el.noteContent.value = draft.content || '';
+          state.currentFile.sha = draft.sha || null;
+          state.currentFile.path = draft.path || '';
+          updateShaIndicator(state.currentFile.sha);
+        }
+      } catch (e) {
+        console.error('Error loading draft', e);
+      }
+    }
+
+    function buildNoteFilePath() {
+      const folder = (el.noteFolder.value || 'notebooks').replace(/^\/+|\/+$/g, '');
+      let title = el.noteTitle.value.trim();
+      const ext = el.noteExtension.value;
+
+      if (!title) {
+        const now = new Date();
+        const dateStr = now.toISOString().slice(0, 10);
+        title = `note_${dateStr}_${Date.now().toString().slice(-4)}`;
+      }
+
+      // If user typed an extension, don't duplicate
+      if (title.endsWith('.md') || title.endsWith('.txt') || title.endsWith('.ipynb')) {
+        return `${folder}/${title}`;
+      }
+      return `${folder}/${title}${ext}`;
+    }
+
+    // Save Note Button Handler
+    async function handleSaveNote() {
+      const content = el.noteContent.value;
+      if (!content.trim() && !el.noteTitle.value.trim()) {
+        showToast('Please type something in the note before saving', 'info');
+        return;
+      }
+
+      const filePath = buildNoteFilePath();
+      const titleName = el.noteTitle.value.trim() || filePath.split('/').pop();
+
+      // UI state saving
+      const btn = el.btnSaveGithub;
+      const originalHtml = btn.innerHTML;
+      btn.disabled = true;
+      btn.innerHTML = `<span class="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></span><span>Saving...</span>`;
+
+      try {
+        const commitMsg = `Save note: ${titleName} (${new Date().toLocaleString()})`;
+        const res = await saveFileToGitHub(filePath, content, commitMsg);
+
+        if (res) {
+          showToast(`Successfully saved "${titleName}" to GitHub!`, 'success');
+          state.currentFile.path = filePath;
+        }
+      } catch (err) {
+        showToast(`Failed to save to GitHub: ${err.message}`, 'error');
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = originalHtml;
+        lucide.createIcons();
+      }
+    }
+
+    // Format Markdown Toolbar Helper
+    function insertMarkdownFormat(format) {
+      const textarea = el.noteContent;
+      const start = textarea.selectionStart;
+      const end = textarea.selectionEnd;
+      const selected = textarea.value.substring(start, end);
+      let replacement = '';
+      let cursorOffset = 0;
+
+      switch (format) {
+        case 'bold':
+          replacement = `**${selected || 'bold text'}**`;
+          cursorOffset = 2;
+          break;
+        case 'italic':
+          replacement = `*${selected || 'italic text'}*`;
+          cursorOffset = 1;
+          break;
+        case 'h1':
+          replacement = `\n# ${selected || 'Heading 1'}\n`;
+          cursorOffset = 3;
+          break;
+        case 'h2':
+          replacement = `\n## ${selected || 'Heading 2'}\n`;
+          cursorOffset = 4;
+          break;
+        case 'ul':
+          replacement = `\n- ${selected || 'List item'}\n`;
+          cursorOffset = 3;
+          break;
+        case 'ol':
+          replacement = `\n1. ${selected || 'First item'}\n`;
+          cursorOffset = 4;
+          break;
+        case 'check':
+          replacement = `\n- [ ] ${selected || 'Task to do'}\n`;
+          cursorOffset = 7;
+          break;
+        case 'code':
+          replacement = selected.includes('\n') 
+            ? `\n\`\`\`javascript\n${selected || '// code here'}\n\`\`\`\n`
+            : `\`${selected || 'code'}\``;
+          cursorOffset = 1;
+          break;
+        case 'quote':
+          replacement = `\n> ${selected || 'Quote'}\n`;
+          cursorOffset = 3;
+          break;
+        case 'table':
+          replacement = `\n| Column 1 | Column 2 |\n| -------- | -------- |\n| Item 1   | Value 1  |\n`;
+          cursorOffset = 2;
+          break;
+        case 'datetime':
+          replacement = `**[${new Date().toLocaleString()}]** `;
+          cursorOffset = replacement.length;
+          break;
+      }
+
+      textarea.setRangeText(replacement, start, end, 'select');
+      textarea.focus();
+      updateEditorStats();
+    }
+
+    // --- VOICE RECORDING & STUDIO ---
+    async function startVoiceRecording() {
+      try {
+        state.audioChunks = [];
+        state.audioBlob = null;
+        if (state.audioUrl) {
+          URL.revokeObjectURL(state.audioUrl);
+          state.audioUrl = null;
+        }
+
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        state.audioStream = stream;
+
+        // Setup Web Audio Analyser for canvas visualizer
+        state.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        const source = state.audioContext.createMediaStreamSource(stream);
+        state.analyser = state.audioContext.createAnalyser();
+        state.analyser.fftSize = 128;
+        source.connect(state.analyser);
+
+        // MediaRecorder setup
+        let mimeType = 'audio/webm';
+        if (!MediaRecorder.isTypeSupported('audio/webm')) {
+          mimeType = MediaRecorder.isTypeSupported('audio/mp4') ? 'audio/mp4' : '';
+        }
+
+        state.recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+
+        state.recorder.ondataavailable = (e) => {
+          if (e.data && e.data.size > 0) {
+            state.audioChunks.push(e.data);
+          }
+        };
+
+        state.recorder.onstop = () => {
+          const finalMime = state.recorder.mimeType || 'audio/webm';
+          state.audioBlob = new Blob(state.audioChunks, { type: finalMime });
+          state.audioUrl = URL.createObjectURL(state.audioBlob);
+          handleRecordingFinished();
+        };
+
+        state.recorder.start(250); // Slice every 250ms
+        state.isRecording = true;
+        state.isPaused = false;
+        state.recordStartTime = Date.now();
+
+        // Update UI
+        el.iconRecordMain.setAttribute('data-lucide', 'square');
+        el.btnRecordMain.className = 'w-16 h-16 rounded-full bg-rose-700 hover:bg-rose-800 text-white flex items-center justify-center shadow-lg shadow-rose-700/40 animate-pulse';
+        el.btnPauseRecord.disabled = false;
+        el.btnResetRecord.disabled = false;
+        el.voiceRecordingStatus.innerHTML = `<span class="w-2.5 h-2.5 rounded-full bg-rose-500 animate-ping"></span> Recording audio...`;
+        el.voiceStandbyMsg.classList.add('hidden');
+        el.recordingPill.classList.remove('hidden');
+
+        // Start Timer
+        startTimer();
+
+        // Start Visualizer Canvas
+        drawVisualizer();
+
+        lucide.createIcons();
+      } catch (err) {
+        console.error('Audio recording error', err);
+        showToast(`Microphone access error: ${err.message}`, 'error');
+      }
+    }
+
+    function pauseVoiceRecording() {
+      if (!state.recorder || !state.isRecording) return;
+
+      if (!state.isPaused) {
+        state.recorder.pause();
+        state.isPaused = true;
+        el.iconPauseRecord.setAttribute('data-lucide', 'play');
+        el.voiceRecordingStatus.innerHTML = `<span class="w-2 h-2 rounded-full bg-amber-500"></span> Recording paused`;
+      } else {
+        state.recorder.resume();
+        state.isPaused = false;
+        el.iconPauseRecord.setAttribute('data-lucide', 'pause');
+        el.voiceRecordingStatus.innerHTML = `<span class="w-2.5 h-2.5 rounded-full bg-rose-500 animate-ping"></span> Recording audio...`;
+      }
+      lucide.createIcons();
+    }
+
+    function stopVoiceRecording() {
+      if (!state.recorder || !state.isRecording) return;
+
+      state.recorder.stop();
+      if (state.audioStream) {
+        state.audioStream.getTracks().forEach(track => track.stop());
+      }
+      clearInterval(state.recordTimerInterval);
+      if (state.canvasAnimId) cancelAnimationFrame(state.canvasAnimId);
+
+      state.isRecording = false;
+      state.isPaused = false;
+
+      // Update UI
+      el.iconRecordMain.setAttribute('data-lucide', 'mic');
+      el.btnRecordMain.className = 'w-16 h-16 rounded-full bg-rose-600 hover:bg-rose-700 text-white flex items-center justify-center shadow-lg shadow-rose-600/30 transition-transform active:scale-95';
+      el.btnPauseRecord.disabled = true;
+      el.recordingPill.classList.add('hidden');
+      el.voiceRecordingStatus.innerHTML = `<span class="w-2 h-2 rounded-full bg-emerald-500"></span> Recording completed`;
+
+      lucide.createIcons();
+    }
+
+    function resetVoiceRecording() {
+      if (state.isRecording) {
+        stopVoiceRecording();
+      }
+      state.audioBlob = null;
+      if (state.audioUrl) {
+        URL.revokeObjectURL(state.audioUrl);
+        state.audioUrl = null;
+      }
+      el.voiceTimer.textContent = '00:00.00';
+      el.voicePlaybackBox.classList.add('hidden');
+      el.btnDownloadAudioLocal.disabled = true;
+      el.btnSaveVoiceGithub.disabled = true;
+      el.voiceStandbyMsg.classList.remove('hidden');
+      el.btnResetRecord.disabled = true;
+      el.btnPauseRecord.disabled = true;
+
+      // Clear canvas
+      const ctx = el.voiceCanvas.getContext('2d');
+      ctx.clearRect(0, 0, el.voiceCanvas.width, el.voiceCanvas.height);
+    }
+
+    function handleRecordingFinished() {
+      if (!state.audioBlob) return;
+
+      // Setup audio preview player
+      el.audioPlayer.src = state.audioUrl;
+      el.voicePlaybackBox.classList.remove('hidden');
+
+      const sizeKb = (state.audioBlob.size / 1024).toFixed(1);
+      el.voiceRecordedSize.textContent = `${sizeKb} KB`;
+
+      // Pre-fill filename with timestamp
+      const now = new Date();
+      const dateTag = now.toISOString().slice(0, 10).replace(/-/g, '');
+      const timeTag = now.toTimeString().slice(0, 8).replace(/:/g, '');
+      const ext = state.audioBlob.type.includes('mp4') ? '.mp4' : '.webm';
+      el.voiceFilename.value = `voice_memo_${dateTag}_${timeTag}${ext}`;
+
+      el.btnDownloadAudioLocal.disabled = false;
+      el.btnSaveVoiceGithub.disabled = false;
+    }
+
+    function startTimer() {
+      clearInterval(state.recordTimerInterval);
+      state.recordTimerInterval = setInterval(() => {
+        if (state.isPaused) return;
+        const elapsed = Date.now() - state.recordStartTime;
+        const mins = Math.floor(elapsed / 60000).toString().padStart(2, '0');
+        const secs = Math.floor((elapsed % 60000) / 1000).toString().padStart(2, '0');
+        const ms = Math.floor((elapsed % 1000) / 10).toString().padStart(2, '0');
+        el.voiceTimer.textContent = `${mins}:${secs}.${ms}`;
+      }, 50);
+    }
+
+    function drawVisualizer() {
+      const canvas = el.voiceCanvas;
+      const ctx = canvas.getContext('2d');
+      canvas.width = canvas.offsetWidth;
+      canvas.height = canvas.offsetHeight;
+
+      const bufferLength = state.analyser.frequencyBinCount;
+      const dataArray = new Uint8Array(bufferLength);
+
+      function renderFrame() {
+        if (!state.isRecording) return;
+        state.canvasAnimId = requestAnimationFrame(renderFrame);
+
+        state.analyser.getByteFrequencyData(dataArray);
+
+        ctx.fillStyle = '#0f172a'; // dark slate bg
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        const barWidth = (canvas.width / bufferLength) * 2;
+        let x = 0;
+
+        for (let i = 0; i < bufferLength; i++) {
+          const barHeight = (dataArray[i] / 255) * canvas.height * 0.9;
+
+          // Gradient color: emerald to rose
+          const gradient = ctx.createLinearGradient(0, canvas.height, 0, 0);
+          gradient.addColorStop(0, '#10b981');
+          gradient.addColorStop(0.7, '#f43f5e');
+          gradient.addColorStop(1, '#ec4899');
+
+          ctx.fillStyle = gradient;
+          ctx.fillRect(x, canvas.height - barHeight, barWidth - 1, barHeight);
+
+          x += barWidth + 1;
+        }
+      }
+
+      renderFrame();
+    }
+
+    // Save Voice to GitHub Handler
+    async function handleSaveVoiceToGitHub() {
+      if (!state.audioBlob) {
+        showToast('No audio recording available to save', 'info');
+        return;
+      }
+
+      const folder = (el.voiceFolder.value || 'notebooks/audio').replace(/^\/+|\/+$/g, '');
+      let filename = el.voiceFilename.value.trim() || `voice_${Date.now()}.webm`;
+      if (!filename.includes('.')) {
+        filename += state.audioBlob.type.includes('mp4') ? '.mp4' : '.webm';
+      }
+
+      const audioFilePath = `${folder}/${filename}`;
+      const btn = el.btnSaveVoiceGithub;
+      const origHtml = btn.innerHTML;
+      btn.disabled = true;
+      btn.innerHTML = `<span class="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></span><span>Uploading Voice...</span>`;
+
+      try {
+        // Convert Blob to Base64
+        const base64Data = await blobToBase64(state.audioBlob);
+        const commitMsg = `Add voice recording: ${filename} (${new Date().toLocaleString()})`;
+
+        await saveBinaryToGitHub(audioFilePath, base64Data, commitMsg);
+        showToast(`Voice recording saved to "${audioFilePath}"!`, 'success');
+
+        // Optional Companion Markdown Note
+        if (el.voiceCreateCompanionNote.checked) {
+          const companionNoteTitle = filename.replace(/\.[^/.]+$/, '');
+          const companionNotePath = `notebooks/${companionNoteTitle}.md`;
+          const companionContent = `# 🎙️ Voice Memo: ${companionNoteTitle}
+**Date Recorded:** ${new Date().toLocaleString()}
+**Audio File:** [\`${filename}\`](${audioFilePath})
+
+### 📝 Notes & Discussion Summary
+${el.voiceNotes.value.trim() || '_No notes recorded._'}
+
+---
+*Saved via GitNotebook Vault*
+`;
+          await saveFileToGitHub(companionNotePath, companionContent, `Add companion note for voice memo: ${filename}`);
+          showToast(`Companion notebook note created at "${companionNotePath}"!`, 'info');
+        }
+
+      } catch (err) {
+        showToast(`Failed to upload voice memo: ${err.message}`, 'error');
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = origHtml;
+        lucide.createIcons();
+      }
+    }
+
+    // --- REPOSITORY FILE EXPLORER & VIEWER ---
+    function renderFileList(filterText = '') {
+      const container = el.fileListContainer;
+      const query = filterText.toLowerCase();
+
+      let list = state.repoFiles || [];
+      if (query) {
+        list = list.filter(item => item.path.toLowerCase().includes(query));
+      }
+
+      el.repoItemCount.textContent = `${list.length} item${list.length === 1 ? '' : 's'}`;
+
+      if (list.length === 0) {
+        container.innerHTML = `
+          <div class="p-6 text-center text-xs text-slate-400">
+            <i data-lucide="file-question" class="w-7 h-7 mx-auto mb-1.5 opacity-40"></i>
+            <p>${query ? 'No matching files found' : 'No notebook files in repository'}</p>
+          </div>
+        `;
+        lucide.createIcons();
+        return;
+      }
+
+      container.innerHTML = list.map(item => {
+        const isAudio = item.path.endsWith('.webm') || item.path.endsWith('.wav') || item.path.endsWith('.mp3') || item.path.endsWith('.mp4');
+        const isNote = item.path.endsWith('.md') || item.path.endsWith('.txt') || item.path.endsWith('.ipynb');
+        const iconName = isAudio ? 'volume-2' : (isNote ? 'file-text' : 'file');
+        const iconColor = isAudio ? 'text-rose-500' : (isNote ? 'text-brand-500' : 'text-blue-500');
+        const fileName = item.path.split('/').pop();
+        const folderName = item.path.split('/').slice(0, -1).join('/');
+
+        return `
+          <div class="repo-file-row group flex items-center justify-between p-2 rounded-lg text-xs hover:bg-slate-100 dark:hover:bg-github-btn cursor-pointer transition-colors" data-path="${item.path}" data-type="${isAudio ? 'audio' : 'note'}">
+            <div class="flex items-center gap-2 min-w-0 flex-1">
+              <i data-lucide="${iconName}" class="w-4 h-4 flex-shrink-0 ${iconColor}"></i>
+              <div class="min-w-0 flex-1">
+                <div class="font-medium truncate text-slate-800 dark:text-slate-200 group-hover:text-brand-600 dark:group-hover:text-brand-400">${fileName}</div>
+                ${folderName ? `<div class="text-[10px] text-slate-400 truncate">${folderName}</div>` : ''}
+              </div>
+            </div>
+            <div class="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
+              <a href="https://github.com/${state.config.owner}/${state.config.repo}/blob/${state.config.branch}/${item.path}" target="_blank" class="p-1 rounded text-slate-400 hover:text-slate-600 dark:hover:text-slate-200" title="Open on GitHub">
+                <i data-lucide="external-link" class="w-3.5 h-3.5"></i>
+              </a>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      lucide.createIcons();
+    }
+
+    function renderNotebookGrid(category = 'all') {
+      const container = el.notebookGridContainer;
+      let list = state.repoFiles || [];
+
+      if (category === 'notes') {
+        list = list.filter(item => item.path.endsWith('.md') || item.path.endsWith('.txt') || item.path.endsWith('.ipynb'));
+      } else if (category === 'audio') {
+        list = list.filter(item => item.path.endsWith('.webm') || item.path.endsWith('.wav') || item.path.endsWith('.mp3') || item.path.endsWith('.mp4'));
+      }
+
+      if (list.length === 0) {
+        container.innerHTML = `
+          <div class="col-span-full text-center py-12 text-slate-400">
+            <i data-lucide="folder-open" class="w-12 h-12 mx-auto mb-2 opacity-40"></i>
+            <p class="text-sm">No ${category === 'all' ? 'files' : category} found in repository.</p>
+          </div>
+        `;
+        lucide.createIcons();
+        return;
+      }
+
+      container.innerHTML = list.map(item => {
+        const isAudio = item.path.endsWith('.webm') || item.path.endsWith('.wav') || item.path.endsWith('.mp3') || item.path.endsWith('.mp4');
+        const fileName = item.path.split('/').pop();
+        const folderName = item.path.split('/').slice(0, -1).join('/') || 'root';
+
+        return `
+          <div class="notebook-card p-4 rounded-xl border border-slate-200 dark:border-github-border bg-white dark:bg-github-card shadow-xs hover:shadow-md transition-shadow flex flex-col justify-between" data-path="${item.path}" data-type="${isAudio ? 'audio' : 'note'}">
+            <div>
+              <div class="flex items-start justify-between gap-2 mb-2">
+                <span class="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded ${isAudio ? 'bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300' : 'bg-brand-100 text-brand-700 dark:bg-brand-950 dark:text-brand-300'}">
+                  <i data-lucide="${isAudio ? 'mic' : 'file-text'}" class="w-3 h-3"></i>
+                  ${isAudio ? 'Voice Memo' : 'Note'}
+                </span>
+                <span class="text-[10px] text-slate-400 font-mono truncate">${folderName}</span>
+              </div>
+              <h4 class="font-bold text-sm text-slate-800 dark:text-slate-100 truncate mb-1" title="${fileName}">${fileName}</h4>
+              <p class="text-[11px] text-slate-500 dark:text-slate-400 line-clamp-2">
+                ${isAudio ? 'Recorded audio memo stored in GitHub repository.' : 'Notebook document ready to edit or view.'}
+              </p>
+            </div>
+
+            <div class="pt-4 border-t border-slate-100 dark:border-github-border/60 flex items-center justify-between mt-3 text-xs">
+              <button class="btn-card-open font-semibold text-brand-600 dark:text-brand-400 hover:underline flex items-center gap-1">
+                <span>${isAudio ? 'Listen / Play' : 'Open in Editor'}</span>
+                <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i>
+              </button>
+              <a href="https://github.com/${state.config.owner}/${state.config.repo}/blob/${state.config.branch}/${item.path}" target="_blank" class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200" title="View on GitHub">
+                <i data-lucide="github" class="w-4 h-4"></i>
+              </a>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      lucide.createIcons();
+    }
+
+    // Load file from repo into editor or audio player
+    async function openRepoFile(filePath, type) {
+      if (type === 'audio') {
+        showToast(`Loading audio from GitHub...`, 'info');
+        switchView('voice');
+        try {
+          const blob = await fetchRawBlob(filePath);
+          if (state.audioUrl) URL.revokeObjectURL(state.audioUrl);
+          state.audioBlob = blob;
+          state.audioUrl = URL.createObjectURL(blob);
+          handleRecordingFinished();
+          el.voiceFilename.value = filePath.split('/').pop();
+          el.audioPlayer.play();
+        } catch (err) {
+          showToast(`Error loading audio: ${err.message}`, 'error');
+        }
+      } else {
+        // Markdown or text note
+        showToast(`Opening note "${filePath}"...`, 'info');
+        switchView('editor');
+        try {
+          const data = await fetchFileContent(filePath);
+          const content = base64ToUtf8(data.content);
+
+          const parts = filePath.split('/');
+          const fileName = parts.pop();
+          const folder = parts.join('/') || 'notebooks';
+
+          el.noteFolder.value = folder;
+          el.noteTitle.value = fileName.replace(/\.[^/.]+$/, '');
+          el.noteContent.value = content;
+          state.currentFile.sha = data.sha;
+          state.currentFile.path = filePath;
+          state.currentFile.isSaved = true;
+
+          updateShaIndicator(data.sha);
+          updateEditorStats();
+          showToast(`Note loaded successfully!`, 'success');
+        } catch (err) {
+          showToast(`Error opening note: ${err.message}`, 'error');
+        }
+      }
+    }
+
+    // Direct File Upload (Attachments, PDFs, Images) to Repo
+    async function handleFileUpload(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      if (!state.config.token || !state.config.owner || !state.config.repo) {
+        showToast('Please connect GitHub repository first', 'error');
+        el.modalSettings.classList.remove('hidden');
+        return;
+      }
+
+      showToast(`Uploading ${file.name} to GitHub...`, 'info');
+      try {
+        const base64Data = await blobToBase64(file);
+        const folder = el.noteFolder.value || 'notebooks/files';
+        const targetPath = `${folder}/${file.name}`;
+        await saveBinaryToGitHub(targetPath, base64Data, `Upload attachment: ${file.name}`);
+        showToast(`File "${file.name}" uploaded to repository!`, 'success');
+
+        // If it's an image or document, insert link into active note
+        const linkMd = file.type.startsWith('image/')
+          ? `\n![${file.name}](${targetPath})\n`
+          : `\n[📎 ${file.name}](${targetPath})\n`;
+        el.noteContent.setRangeText(linkMd, el.noteContent.selectionStart, el.noteContent.selectionEnd, 'select');
+        updateEditorStats();
+      } catch (err) {
+        showToast(`File upload failed: ${err.message}`, 'error');
+      }
+    }
+
+    // --- VIEW SWITCHING ---
+    function switchView(viewName) {
+      // Reset tabs UI
+      const tabs = [el.tabEditor, el.tabVoice, el.tabNotebookView];
+      tabs.forEach(t => {
+        t.className = 'flex items-center gap-1.5 px-3 py-1.5 rounded-md transition-all text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white';
+      });
+
+      el.viewEditor.classList.add('hidden');
+      el.viewVoice.classList.add('hidden');
+      el.viewNotebookGrid.classList.add('hidden');
+
+      if (viewName === 'editor') {
+        el.tabEditor.className = 'flex items-center gap-1.5 px-3 py-1.5 rounded-md transition-all bg-white dark:bg-github-btn text-slate-900 dark:text-white shadow-xs font-semibold';
+        el.viewEditor.classList.remove('hidden');
+        el.editorActions.classList.remove('hidden');
+      } else if (viewName === 'voice') {
+        el.tabVoice.className = 'flex items-center gap-1.5 px-3 py-1.5 rounded-md transition-all bg-white dark:bg-github-btn text-slate-900 dark:text-white shadow-xs font-semibold';
+        el.viewVoice.classList.remove('hidden');
+        el.editorActions.classList.add('hidden');
+      } else if (viewName === 'notebook') {
+        el.tabNotebookView.className = 'flex items-center gap-1.5 px-3 py-1.5 rounded-md transition-all bg-white dark:bg-github-btn text-slate-900 dark:text-white shadow-xs font-semibold';
+        el.viewNotebookGrid.classList.remove('hidden');
+        el.editorActions.classList.add('hidden');
+        renderNotebookGrid();
+      }
+    }
+
+    // --- TOAST NOTIFICATION UTILITY ---
+    function showToast(message, type = 'info') {
+      const toast = document.createElement('div');
+      const icons = {
+        success: 'check-circle',
+        error: 'alert-triangle',
+        info: 'info'
+      };
+      const colors = {
+        success: 'bg-emerald-600 text-white',
+        error: 'bg-rose-600 text-white',
+        info: 'bg-slate-800 text-white dark:bg-slate-700'
+      };
+
+      toast.className = `flex items-center gap-2.5 px-4 py-2.5 rounded-xl shadow-lg text-xs font-medium transition-all transform translate-y-2 opacity-0 pointer-events-auto ${colors[type] || colors.info}`;
+      toast.innerHTML = `
+        <i data-lucide="${icons[type] || 'info'}" class="w-4 h-4 flex-shrink-0"></i>
+        <span>${message}</span>
+      `;
+
+      el.toastContainer.appendChild(toast);
+      lucide.createIcons({ root: toast });
+
+      requestAnimationFrame(() => {
+        toast.classList.remove('translate-y-2', 'opacity-0');
+      });
+
+      setTimeout(() => {
+        toast.classList.add('opacity-0', 'translate-y-2');
+        setTimeout(() => toast.remove(), 250);
+      }, 4000);
+    }
+
+    // --- EVENT LISTENERS SETUP ---
+    function setupEventListeners() {
+      // Theme toggle
+      el.btnThemeToggle.addEventListener('click', () => {
+        const isDark = document.documentElement.classList.toggle('dark');
+        localStorage.setItem('theme', isDark ? 'dark' : 'light');
+      });
+
+      // Mobile sidebar toggle
+      el.btnToggleSidebar.addEventListener('click', () => el.sidebar.classList.toggle('-translate-x-full'));
+      el.btnCloseSidebar.addEventListener('click', () => el.sidebar.classList.add('-translate-x-full'));
+
+      // View Switching
+      el.tabEditor.addEventListener('click', () => switchView('editor'));
+      el.tabVoice.addEventListener('click', () => switchView('voice'));
+      el.tabNotebookView.addEventListener('click', () => switchView('notebook'));
+
+      // Settings Modal
+      el.btnOpenSettings.addEventListener('click', () => el.modalSettings.classList.remove('hidden'));
+      el.btnSetupConnHint.addEventListener('click', () => el.modalSettings.classList.remove('hidden'));
+      el.btnCloseSettings.addEventListener('click', () => el.modalSettings.classList.add('hidden'));
+      el.btnToggleTokenEye.addEventListener('click', () => {
+        el.cfgToken.type = el.cfgToken.type === 'password' ? 'text' : 'password';
+      });
+      el.btnTestConnection.addEventListener('click', testGitHubConnection);
+      el.btnSaveSettings.addEventListener('click', saveConfig);
+      el.btnClearSettings.addEventListener('click', clearConfig);
+
+      // Templates Modal
+      el.btnTemplates.addEventListener('click', () => el.modalTemplates.classList.remove('hidden'));
+      el.btnCloseTemplates.addEventListener('click', () => el.modalTemplates.classList.add('hidden'));
+      document.querySelectorAll('.template-item').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const tmplKey = btn.getAttribute('data-template');
+          if (TEMPLATES[tmplKey]) {
+            el.noteContent.value = TEMPLATES[tmplKey];
+            el.noteTitle.value = tmplKey.charAt(0).toUpperCase() + tmplKey.slice(1);
+            updateEditorStats();
+            el.modalTemplates.classList.add('hidden');
+            showToast('Template applied!', 'info');
+          }
+        });
+      });
+
+      // Split Preview Toggle
+      el.btnToggleSplit.addEventListener('click', () => {
+        const isHidden = el.previewPane.classList.toggle('hidden');
+        if (!isHidden) renderMarkdownPreview();
+      });
+
+      // Editor formatting buttons
+      document.querySelectorAll('.md-fmt').forEach(btn => {
+        btn.addEventListener('click', () => insertMarkdownFormat(btn.getAttribute('data-fmt')));
+      });
+
+      // Insert Voice Memo button inside Editor
+      el.btnInsertVoice.addEventListener('click', () => {
+        switchView('voice');
+        showToast('Record your voice memo here, then hit Save to include it in your notebook!', 'info');
+      });
+
+      // Save Note to GitHub
+      el.btnSaveGithub.addEventListener('click', handleSaveNote);
+
+      // Editor input events
+      el.noteContent.addEventListener('input', updateEditorStats);
+      el.noteTitle.addEventListener('input', saveDraft);
+      el.noteFolder.addEventListener('input', saveDraft);
+      el.noteExtension.addEventListener('change', saveDraft);
+
+      // Shortcut: Ctrl+S / Cmd+S to Save to GitHub
+      window.addEventListener('keydown', (e) => {
+        if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+          e.preventDefault();
+          handleSaveNote();
+        }
+      });
+
+      // Download note locally
+      el.btnExportLocal.addEventListener('click', () => {
+        const text = el.noteContent.value;
+        const filename = (el.noteTitle.value || 'note') + el.noteExtension.value;
+        const blob = new Blob([text], { type: 'text/markdown;charset=utf-8' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = filename;
+        a.click();
+        URL.revokeObjectURL(a.href);
+      });
+
+      // Clear note
+      el.btnClearNote.addEventListener('click', () => {
+        if (confirm('Clear current editor content?')) {
+          el.noteTitle.value = '';
+          el.noteContent.value = '';
+          state.currentFile.sha = null;
+          state.currentFile.path = '';
+          updateShaIndicator(null);
+          updateEditorStats();
+        }
+      });
+
+      // Quick action: New note
+      el.btnNewNote.addEventListener('click', () => {
+        switchView('editor');
+        el.noteTitle.value = '';
+        el.noteContent.value = '';
+        state.currentFile.sha = null;
+        state.currentFile.path = '';
+        updateShaIndicator(null);
+        updateEditorStats();
+        el.noteTitle.focus();
+      });
+
+      // Quick action: Record voice
+      el.btnQuickRecord.addEventListener('click', () => {
+        switchView('voice');
+      });
+
+      // Refresh repo
+      el.btnRefreshRepo.addEventListener('click', () => {
+        fetchRepoFiles();
+        showToast('Refreshed files from GitHub repository', 'info');
+      });
+
+      // Search files in repo
+      el.searchFiles.addEventListener('input', (e) => {
+        renderFileList(e.target.value);
+      });
+
+      // File upload
+      el.fileUploadInput.addEventListener('change', handleFileUpload);
+
+      // File list row click
+      el.fileListContainer.addEventListener('click', (e) => {
+        const row = e.target.closest('.repo-file-row');
+        if (row && !e.target.closest('a')) {
+          const path = row.getAttribute('data-path');
+          const type = row.getAttribute('data-type');
+          openRepoFile(path, type);
+          if (window.innerWidth < 1024) el.sidebar.classList.add('-translate-x-full');
+        }
+      });
+
+      // Notebook Grid card click
+      el.notebookGridContainer.addEventListener('click', (e) => {
+        const card = e.target.closest('.notebook-card');
+        if (card && !e.target.closest('a')) {
+          const path = card.getAttribute('data-path');
+          const type = card.getAttribute('data-type');
+          openRepoFile(path, type);
+        }
+      });
+
+      // Filter buttons on Notebook Grid
+      el.btnFilterAll.addEventListener('click', () => {
+        renderNotebookGrid('all');
+        updateFilterBtnStyle(el.btnFilterAll);
+      });
+      el.btnFilterNotes.addEventListener('click', () => {
+        renderNotebookGrid('notes');
+        updateFilterBtnStyle(el.btnFilterNotes);
+      });
+      el.btnFilterAudio.addEventListener('click', () => {
+        renderNotebookGrid('audio');
+        updateFilterBtnStyle(el.btnFilterAudio);
+      });
+
+      function updateFilterBtnStyle(activeBtn) {
+        [el.btnFilterAll, el.btnFilterNotes, el.btnFilterAudio].forEach(b => {
+          b.className = 'px-2.5 py-1 text-xs rounded-md border border-slate-200 dark:border-github-border hover:bg-slate-100 dark:hover:bg-github-btn';
+        });
+        activeBtn.className = 'px-2.5 py-1 text-xs rounded-md bg-brand-600 text-white font-medium';
+      }
+
+      // Voice Controls
+      el.btnRecordMain.addEventListener('click', () => {
+        if (!state.isRecording) {
+          startVoiceRecording();
+        } else {
+          stopVoiceRecording();
+        }
+      });
+
+      el.btnPauseRecord.addEventListener('click', pauseVoiceRecording);
+      el.btnResetRecord.addEventListener('click', resetVoiceRecording);
+      el.btnSaveVoiceGithub.addEventListener('click', handleSaveVoiceToGitHub);
+
+      // Download audio locally
+      el.btnDownloadAudioLocal.addEventListener('click', () => {
+        if (!state.audioBlob) return;
+        const a = document.createElement('a');
+        a.href = state.audioUrl;
+        a.download = el.voiceFilename.value || 'voice_recording.webm';
+        a.click();
+      });
+    }
+
+    // Run on page ready
+    document.addEventListener('DOMContentLoaded', init);
+  </script>
+</body>
+</html>
